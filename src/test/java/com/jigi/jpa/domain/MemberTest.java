@@ -2,16 +2,18 @@ package com.jigi.jpa.domain;
 
 import com.github.javafaker.Faker;
 import com.jigi.jpa.dto.UserDto;
-import org.junit.jupiter.api.BeforeEach;
+import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Profile;
 
 import javax.persistence.EntityManager;
+import javax.persistence.Tuple;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 import java.util.List;
 import java.util.Locale;
@@ -23,7 +25,6 @@ class MemberTest {
     @Autowired
     private EntityManager em;
 
-    @BeforeEach
     void setUp() {
 
         Faker faker = new Faker(new Locale("ko"));
@@ -108,7 +109,7 @@ class MemberTest {
                 .getResultList();
 
         for (Object row : resultList) {
-            System.out.println("name = " + ((Member)row).getName());
+            System.out.println("name = " + ((Member) row).getName());
         }
     }
 
@@ -128,6 +129,68 @@ class MemberTest {
         for (Member row : members) {
             System.out.println("name = " + row.getName());
         }
+    }
+
+    @Test
+    void jpqlTest7() {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Member> cq = cb.createQuery(Member.class);
+
+        Root<Member> m = cq.from(Member.class);
+        Predicate usernameEqual = cb.equal(m.get("id"), 10l);
+
+        javax.persistence.criteria.Order ageDesc = cb.desc(m.get("id"));
+
+        cq.select(m)
+                .where(usernameEqual)
+                .orderBy(ageDesc);
+
+        List<Member> members = em.createQuery(cq).getResultList();
+
+        for (Member row : members) {
+            System.out.println("name = " + row.getName());
+        }
+    }
+
+    @Test
+    void jpqlTest8() {
+
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Tuple> cq = cb.createTupleQuery();
+
+        Root<Member> m = cq.from(Member.class);
+        cq.multiselect(
+                m.get("name").alias("name"),
+                m.get("address").alias("addr")
+        );
+
+        TypedQuery<Tuple> query = em.createQuery(cq);
+        List<Tuple> resultList = query.getResultList();
+
+        for (Tuple tuple : resultList) {
+            System.out.println("name = " + tuple.get("name", String.class));
+            System.out.println("address = " + tuple.get("addr", Address.class).getStreet());
+        }
+    }
+
+    @Test
+    void jpqlTest9() {
+
+        JPAQueryFactory queryFactory = new JPAQueryFactory(em);
+
+        QMember qMember = QMember.member;
+
+        List<Member> members = queryFactory
+                .selectFrom(qMember)
+                .where(qMember.id.eq(5l))
+                .orderBy(qMember.name.desc())
+                .fetch();
+
+        for (Member member : members) {
+            System.out.println(member.getName());
+            System.out.println(member.getAddress().getCity());
+        }
+
     }
 
 }
